@@ -67,7 +67,7 @@ app.add_middleware(
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key=SECRET_KEY,
+    secret_key="CHANGE_ME_BRUH",
     same_site="none",
     https_only=True,
     domain=".example.com",
