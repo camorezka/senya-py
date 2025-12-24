@@ -1,9 +1,16 @@
-import asyncio
-import logging
 import os
 import sys
-import aiohttp
-from aiohttp import web
+import logging
+import asyncio
+import requests
+
+from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import RedirectResponse, JSONResponse
+from starlette.middleware.sessions import SessionMiddleware
+from authlib.integrations.starlette_client import OAuth
+
+
 
 # ===== ЛОГИРОВАНИЕ =====
 logging.basicConfig(
@@ -14,33 +21,21 @@ logging.basicConfig(
 logger = logging.getLogger("service")
 
 # ===== КОНФИГУРАЦИЯ =====
-WEB_SERVER_HOST = "0.0.0.0"
 WEB_SERVER_PORT = int(os.getenv("PORT", 8080))
-BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL")  # необязательно
-
-
-
-
-import asyncio
-import os
-import requests
-
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
-from starlette.middleware.sessions import SessionMiddleware
-from authlib.integrations.starlette_client import OAuth
-
-# ================= НАСТРОЙКИ =================
+BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL", None)
 
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
+
+
 
 GROQ_API_KEY = os.getenv("GROQ_API_KEY", "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")
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "68632825614-tfjkfpe616jrcfjl02l0k5gd8ar25jbj.apps.googleusercontent.com")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "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")
-
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
 MODEL = "openai/gpt-oss-120b"
+
+
 
 SYSTEM_PROMPT = """Ты — Сеня, мой личный ИИ-помощник. Никто другой, только Сеня. 
 Отвечай на вопросы по текстам, кодам, домашке и проектам. Генерируй очень быстро, проффисеонально.
@@ -54,13 +49,16 @@ SYSTEM_PROMPT = """Ты — Сеня, мой личный ИИ-помощник.
 MAX_HISTORY = 50
 MAX_REQUESTS = 10
 
-# ================= APP =================
+user_history = {}
+user_requests = {}
 
+# ===== APP =====
 app = FastAPI()
 
+# ===== MIDDLEWARE =====
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # для Vercel
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -73,6 +71,7 @@ app.add_middleware(
     https_only=False,
 )
 
+# ===== OAuth =====
 oauth = OAuth()
 oauth.register(
     name="google",
@@ -82,12 +81,7 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"},
 )
 
-user_history = {}
-user_requests = {}
-registered_users = {}
-
-# ================= LOGIC =================
-
+# ===== LOGIC =====
 def ask_senya(user_id: str, text: str) -> str:
     if user_requests.get(user_id, 0) >= MAX_REQUESTS:
         return "Лимит запросов исчерпан."
@@ -121,7 +115,15 @@ def ask_senya(user_id: str, text: str) -> str:
 
     return answer
 
-# ================= ROUTES =================
+# ===== ROUTES =====
+
+@app.get("/ping")
+async def ping():
+    return {"status": "alive"}
+
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
 
 @app.post("/chat")
 async def chat(req: Request):
@@ -133,95 +135,26 @@ async def chat(req: Request):
 
 @app.get("/auth/google")
 async def google_login(request: Request):
-    redirect_uri = "https://ТВОЙ_BACKEND/auth/google/callback"
+    redirect_uri = "https://senya-py.onrender.com/auth/google/callback"  # твой Render URL
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 @app.get("/auth/google/callback")
 async def google_callback(request: Request):
     token = await oauth.google.authorize_access_token(request)
     user = token["userinfo"]
-
     request.session["user"] = {
         "id": user["sub"],
         "name": user["name"],
         "email": user.get("email")
     }
-
-    return RedirectResponse("https://ТВОЙ_VERCEL")
+    # редирект на фронтенд (Vercel)
+    return RedirectResponse("https://твоя_страница.vercel.app")
 
 @app.get("/me")
 async def me(request: Request):
-    return request.session.get("user")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-# ===== KEEP ALIVE =====
-async def keep_alive():
-    while True:
-        try:
-            url = f"{BASE_WEBHOOK_URL}/ping" if BASE_WEBHOOK_URL else "http://localhost/ping"
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url) as resp:
-                    logger.info(f"🔁 Keep-alive ping: {resp.status}")
-        except Exception as e:
-            logger.error(f"🚨 Keep-alive error: {e}")
-        await asyncio.sleep(300)
-
-# ===== HANDLERS =====
-async def ping_handler(request):
-    return web.Response(text="✅ Service is alive")
-
-async def health_handler(request):
-    return web.json_response({
-        "status": "ok",
-        "service": "simple-backend"
-    })
-
-# ===== START / STOP =====
-async def on_startup(app):
-    logger.info("🚀 Service started")
-    asyncio.create_task(keep_alive())
-
-async def on_shutdown(app):
-    logger.info("🛑 Service stopped")
-
-# ===== APP =====
-
-
-
-
-
-
-
-
-
-
-
-def create_app():
-    app = web.Application()
-    app.router.add_get("/ping", ping_handler)
-    app.router.add_get("/health", health_handler)
-    app.on_startup.append(on_startup)
-    app.on_shutdown.append(on_shutdown)
-    return app
+    return request.session.get("user") or {}
 
 # ===== MAIN =====
 if __name__ == "__main__":
-    try:
-        app = create_app()
-        web.run_app(app, host=WEB_SERVER_HOST, port=WEB_SERVER_PORT)
-    except Exception as e:
-        logger.critical(f"💥 Critical error: {e}")
-        sys.exit(1)
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=WEB_SERVER_PORT)
