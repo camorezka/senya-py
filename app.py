@@ -69,8 +69,8 @@ app.add_middleware(
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
-    same_site="lax", 
-    https_only=False
+    same_site="none", 
+    https_only=True
 )
 
 
@@ -153,7 +153,8 @@ async def google_callback(request: Request):
         "email": user.get("email")
     }
     # редирект на фронтенд (Vercel)
-    return RedirectResponse("https://senya.vercel.app")
+    return RedirectResponse("https://senya.vercel.app?logged_in=1")
+
 
 @app.get("/me")
 async def me(request: Request):
