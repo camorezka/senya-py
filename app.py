@@ -55,14 +55,15 @@ user_requests = {}
 # ===== APP =====
 app = FastAPI()
 
-# ===== MIDDLEWARE =====
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["https://senya.vercel.app"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
 
 app.add_middleware(
     SessionMiddleware,
