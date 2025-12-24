@@ -65,12 +65,12 @@ app.add_middleware(
 
 
 
+
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
-    same_site="none",
-    https_only=True,
-    domain="none",
+    same_site="lax", 
+    https_only=True, 
 )
 
 
