@@ -148,7 +148,7 @@ async def google_callback(request: Request):
         "email": user.get("email")
     }
     # редирект на фронтенд (Vercel)
-    return RedirectResponse("https://твоя_страница.vercel.app")
+    return RedirectResponse("https://senya.vercel.app")
 
 @app.get("/me")
 async def me(request: Request):
