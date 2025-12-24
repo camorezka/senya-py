@@ -32,6 +32,7 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY", "gsk_rPEk4wt1G5M9cedRipKvWGdyb3FYNCZ9mX
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "68632825614-tfjkfpe616jrcfjl02l0k5gd8ar25jbj.apps.googleusercontent.com")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "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")
 API_URL = "https://api.groq.com/openai/v1/chat/completions"
+SECRET_KEY = 'CHANGE_ME_BRUH'
 MODEL = "openai/gpt-oss-120b"
 
 
@@ -66,7 +67,7 @@ app.add_middleware(
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key="CHANGE_ME_BRUH",
+    secret_key=SECRET_KEY,
     same_site="none",
     https_only=True,
     domain="none",
