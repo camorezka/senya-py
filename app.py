@@ -70,7 +70,7 @@ app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
     same_site="none", 
-    https_only=True, 
+    https_only=False, 
 )
 
 
