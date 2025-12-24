@@ -83,7 +83,9 @@ oauth.register(
     client_secret=GOOGLE_CLIENT_SECRET,
     server_metadata_url="https://accounts.google.com/.well-known/openid-configuration",
     client_kwargs={"scope": "openid email profile"},
+    skip_authorization=True
 )
+
 
 # ===== LOGIC =====
 def ask_senya(user_id: str, text: str) -> str:
