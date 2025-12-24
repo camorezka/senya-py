@@ -25,7 +25,6 @@ WEB_SERVER_PORT = int(os.getenv("PORT", 8080))
 BASE_WEBHOOK_URL = os.getenv("BASE_WEBHOOK_URL", None)
 
 os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
-os.environ["OAUTHLIB_INSECURE_TRANSPORT"] = "1"
 
 
 
@@ -70,7 +69,7 @@ app.add_middleware(
     secret_key="CHANGE_ME_BRUH",
     same_site="none",
     https_only=True,
-    domain=".example.com",
+    domain="none",
 )
 
 
