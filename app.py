@@ -67,10 +67,12 @@ app.add_middleware(
 
 app.add_middleware(
     SessionMiddleware,
-    secret_key="CHANGE_ME_SECRET",
-    same_site="none",   
-    https_only=True,    
+    secret_key=SECRET_KEY,
+    same_site="none",
+    https_only=True,
+    domain=".example.com",
 )
+
 
 
 # ===== OAuth =====
