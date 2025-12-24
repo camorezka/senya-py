@@ -52,9 +52,10 @@ MAX_REQUESTS = 10
 user_history = {}
 user_requests = {}
 
-# ===== APP =====
+# ===== Приложение =====
 app = FastAPI()
 
+# CORS для фронтенда на Vercel
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["https://senya.vercel.app"],
@@ -63,17 +64,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
-
+# Сессии с куки, чтобы OAuth state работал на мобильных
 app.add_middleware(
     SessionMiddleware,
     secret_key=SECRET_KEY,
-    same_site="none", 
-    https_only=True
+    same_site="none",   # кросс-доменная сессия
+    https_only=True     # работает только на HTTPS
 )
-
-
 
 # ===== OAuth =====
 oauth = OAuth()
@@ -85,82 +82,38 @@ oauth.register(
     client_kwargs={"scope": "openid email profile"}
 )
 
-
-# ===== LOGIC =====
-def ask_senya(user_id: str, text: str) -> str:
-    if user_requests.get(user_id, 0) >= MAX_REQUESTS:
-        return "Лимит запросов исчерпан."
-
-    user_requests[user_id] = user_requests.get(user_id, 0) + 1
-
-    if user_id not in user_history:
-        user_history[user_id] = [{"role": "system", "content": SYSTEM_PROMPT}]
-
-    user_history[user_id].append({"role": "user", "content": text})
-
-    payload = {
-        "model": MODEL,
-        "messages": user_history[user_id],
-        "temperature": 0.7
-    }
-
-    headers = {
-        "Authorization": f"Bearer {GROQ_API_KEY}",
-        "Content-Type": "application/json"
-    }
-
-    r = requests.post(API_URL, headers=headers, json=payload)
-    r.raise_for_status()
-
-    answer = r.json()["choices"][0]["message"]["content"]
-    user_history[user_id].append({"role": "assistant", "content": answer})
-
-    if len(user_history[user_id]) > MAX_HISTORY:
-        user_history[user_id] = user_history[user_id][-MAX_HISTORY:]
-
-    return answer
-
-# ===== ROUTES =====
-
-@app.get("/ping")
-async def ping():
-    return {"status": "alive"}
-
-@app.get("/health")
-async def health():
-    return {"status": "ok"}
-
-@app.post("/chat")
-async def chat(req: Request):
-    data = await req.json()
-    user_id = data.get("user_id", "guest")
-    text = data.get("text", "")
-    answer = await asyncio.to_thread(ask_senya, user_id, text)
-    return {"answer": answer}
-
+# ===== Маршруты =====
 @app.get("/auth/google")
 async def google_login(request: Request):
-    redirect_uri = "https://senya-py.onrender.com/auth/google/callback"  # твой Render URL
+    redirect_uri = "https://senya-py.onrender.com/auth/google/callback"
     return await oauth.google.authorize_redirect(request, redirect_uri)
 
 @app.get("/auth/google/callback")
 async def google_callback(request: Request):
-    token = await oauth.google.authorize_access_token(request)
-    user = token["userinfo"]
-    request.session["user"] = {
-        "id": user["sub"],
-        "name": user["name"],
-        "email": user.get("email")
-    }
-    # редирект на фронтенд (Vercel)
+    try:
+        token = await oauth.google.authorize_access_token(request)
+        user = token["userinfo"]
+        request.session["user"] = {
+            "id": user["sub"],
+            "name": user["name"],
+            "email": user.get("email")
+        }
+    except Exception as e:
+        logger.error(f"OAuth callback error: {e}")
+        return JSONResponse({"error": "OAuth failed"}, status_code=400)
+    
+    # Редирект на фронтенд с параметром
     return RedirectResponse("https://senya.vercel.app?logged_in=1")
-
 
 @app.get("/me")
 async def me(request: Request):
     return request.session.get("user") or {}
 
-# ===== MAIN =====
+@app.get("/ping")
+async def ping():
+    return {"status": "alive"}
+
+# ===== Запуск =====
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=WEB_SERVER_PORT)
