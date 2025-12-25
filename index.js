@@ -4,12 +4,6 @@ import session from "express-session";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import fetch from "node-fetch";
-import path from "path";
-import { fileURLToPath } from "url";
-import fs from "fs";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -103,16 +97,6 @@ app.post("/chat", async (req, res) => {
 
 /* ===== PING ===== */
 app.get("/ping", (_, res) => res.json({ status: "alive" }));
-
-/* ===== STATIC FRONTEND (если есть) ===== */
-const publicPath = path.join(__dirname, "public");
-if (fs.existsSync(publicPath)) {
-  app.use(express.static(publicPath));
-
-  app.get("*", (req, res) => {
-    res.sendFile(path.join(publicPath, "index.html"));
-  });
-}
 
 /* ===== START SERVER ===== */
 app.listen(PORT, () => {
