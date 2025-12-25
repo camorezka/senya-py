@@ -25,11 +25,9 @@ const GOOGLE_CLIENT_ID = "68632825614-tfjkfpe616jrcfjl02l0k5gd8ar25jbj.apps.goog
 // ВАЖНО: Никогда не храни ключ в коде. На Render добавь его в Environment Variables
 const GROQ_KEY = process.env.GROQ_KEY || "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"; 
 const JWT_SECRET = process.env.JWT_SECRET || 'my-super-secret-jwt-key-for-senya';
+const SYSTEM_PROMPT = "Ты — Сеня, мой личный ИИ-помощник. Никто другой, только Сеня. Отвечай на вопросы по текстам, кодам, домашке и проектам. Генерируй очень быстро, проффисеонально. Не здоровайся каждый раз, 1 раз в чате и все. Лимит сообщения: 3-5 абзацев, пиши подробно, если просят. Если спрашивают, кто ты — говори, что ты Сеня, ИИ, созданный на основе разных технологий. Никогда не называй свою модель. Не используй LaTeX, формулы только обычным текстом. Пиши простыми словами, по существу. Сохраняй анонимность пользователя. Поясняй термины и приводь примеры, если нужно.";
 
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
-
-// Системный промпт
-const SYSTEM_PROMPT = "Ты — Сеня, мой личный ИИ-помощник. Никто другой, только Сеня. Отвечай на вопросы по текстам, кодам, домашке и проектам. Генерируй очень быстро, проффисеонально. Не здоровайся каждый раз, 1 раз в чате и все. Лимит сообщения: 3-5 абзацев, пиши подробно, если просят. Если спрашивают, кто ты — говори, что ты Сеня, ИИ, созданный на основе разных технологий. Никогда не называй свою модель. Не используй LaTeX, формулы только обычным текстом. Пиши простыми словами, по существу. Сохраняй анонимность пользователя. Поясняй термины и приводь примеры, если нужно.";
 
 // Авторизация через Google
 app.post('/auth/google', async (req, res) => {
@@ -92,8 +90,8 @@ app.post('/chat', authenticateToken, async (req, res) => {
             return res.status(400).json({ error: "Список сообщений пуст" });
         }
 
-        // Добавляем системный промпт первым сообщением
-        const finalMessages = [
+        // Добавляем системный промпт в начало списка сообщений
+        const messagesWithPrompt = [
             { role: "system", content: SYSTEM_PROMPT },
             ...sanitizedMessages
         ];
@@ -106,7 +104,7 @@ app.post('/chat', authenticateToken, async (req, res) => {
             },
             body: JSON.stringify({
                 model: "openai/gpt-oss-120b",
-                messages: finalMessages, // Отправляем массив вместе с промптом
+                messages: messagesWithPrompt,
                 temperature: 0.7,
                 max_tokens: 1024
             })
