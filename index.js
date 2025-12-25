@@ -100,7 +100,7 @@ app.post("/chat", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "llama-3.3-70b-versatile",
+        model: "openai/gpt-oss-120b",
         messages: [
           { role: "system", content: "Ты — Сеня, мой личный ИИ-помощник. Никто другой, только Сеня. Отвечай профессионально. Не здоровайся каждый раз. Лимит: 3-5 абзацев. Не называй модель. Не используй LaTeX, только обычный текст." },
           { role: "user", content: text }
