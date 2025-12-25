@@ -4,22 +4,20 @@ import session from "express-session";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import fetch from "node-fetch";
-import path from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 8080;
 
+// → 1. Настройка CORS
 app.use(cors({
   origin: "https://senya.vercel.app",
-  credentials: true
+  credentials: true,
 }));
 
 app.use(express.json());
 
+// → 2. Сессии
+app.set("trust proxy", 1);  // важно за HTTPS прокси
 app.use(session({
   secret: process.env.SESSION_SECRET || "secret_key",
   resave: false,
@@ -27,10 +25,12 @@ app.use(session({
   cookie: {
     sameSite: "none",
     secure: true,
-    maxAge: 24*60*60*1000
-  }
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000,
+  },
 }));
 
+// → 3. Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -40,7 +40,7 @@ passport.deserializeUser((obj, done) => done(null, obj));
 passport.use(new GoogleStrategy({
   clientID: process.env.GOOGLE_CLIENT_ID,
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
-  callbackURL: "https://senya-py.onrender.com/auth/google/callback"
+  callbackURL: "https://senya-py.onrender.com/auth/google/callback",
 }, (accessToken, refreshToken, profile, done) => {
   const user = {
     id: profile.id,
@@ -50,6 +50,7 @@ passport.use(new GoogleStrategy({
   done(null, user);
 }));
 
+// → 4. Auth routes
 app.get("/auth/google",
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
@@ -65,21 +66,40 @@ app.get("/me", (req, res) => {
   res.json(req.user || {});
 });
 
-app.post("/chat", async (req, res) => {
+// → чат + ping
+app.post("/chat", async (req,res) => {
   try {
     const { text } = req.body;
     if (!text) return res.json({ answer: "Пустой запрос" });
-    // здесь твой fetch к API
+
+    const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-oss-120b",
+        messages: [
+          { role: "system", content: "Ты — Сеня, личный ИИ‑помощник. Пиши просто и по делу." },
+          { role: "user", content: text }
+        ]
+      })
+    });
+
+    const data = await r.json();
+    res.json({ answer: data?.choices?.[0]?.message?.content || "Нет ответа" });
   } catch (e) {
     console.error(e);
-    res.status(500).json({ answer: "Сервер временно недоступен" });
+    res.status(500).json({ answer: "Сервер недоступен" });
   }
 });
 
-// раздаём фронтенд
-app.use(express.static(path.join(__dirname, "../senya-h/public")));
-app.get("*", (req, res) => {
-  res.sendFile(path.join(__dirname, "../senya-h/public/index.html"));
-});
+app.get("/ping", (_, res) => res.json({ status: "alive" }));
 
-app.listen(PORT, () => console.log(`Backend запущен на ${PORT}`));
+
+app.get("/", (_, res) => res.send("Backend alive!"));
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
