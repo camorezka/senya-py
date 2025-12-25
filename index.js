@@ -8,16 +8,33 @@ import fetch from "node-fetch";
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-// → 1. Настройка CORS
+// CORS правильные заголовки
 app.use(cors({
   origin: "https://senya.vercel.app",
-  credentials: true,
+  credentials: true
 }));
 
-app.use(express.json());
+// handle preflight
+app.options("*", (req, res) => {
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Origin", "https://senya.vercel.app");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  res.sendStatus(200);
+});
 
-// → 2. Сессии
-app.set("trust proxy", 1);  // важно за HTTPS прокси
+// ручные заголовки
+app.use((req, res, next) => {
+  res.setHeader("Access-Control-Allow-Credentials", "true");
+  res.setHeader("Access-Control-Allow-Origin", "https://senya.vercel.app");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,OPTIONS");
+  next();
+});
+
+app.use(express.json());
+app.set("trust proxy", 1);
+
 app.use(session({
   secret: process.env.SESSION_SECRET || "secret_key",
   resave: false,
@@ -27,10 +44,10 @@ app.use(session({
     secure: true,
     httpOnly: true,
     maxAge: 24 * 60 * 60 * 1000,
+    // domain может помочь, но не гарантирует в Safari/Firefox
   },
 }));
 
-// → 3. Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
@@ -42,15 +59,10 @@ passport.use(new GoogleStrategy({
   clientSecret: process.env.GOOGLE_CLIENT_SECRET,
   callbackURL: "https://senya-py.onrender.com/auth/google/callback",
 }, (accessToken, refreshToken, profile, done) => {
-  const user = {
-    id: profile.id,
-    name: profile.displayName,
-    email: profile.emails?.[0]?.value
-  };
+  const user = { id: profile.id, name: profile.displayName, email: profile.emails?.[0]?.value };
   done(null, user);
 }));
 
-// → 4. Auth routes
 app.get("/auth/google",
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
@@ -66,8 +78,8 @@ app.get("/me", (req, res) => {
   res.json(req.user || {});
 });
 
-// → чат + ping
-app.post("/chat", async (req,res) => {
+// чат и ping остаются
+app.post("/chat", async (req, res) => {
   try {
     const { text } = req.body;
     if (!text) return res.json({ answer: "Пустой запрос" });
@@ -96,10 +108,6 @@ app.post("/chat", async (req,res) => {
 });
 
 app.get("/ping", (_, res) => res.json({ status: "alive" }));
-
-
 app.get("/", (_, res) => res.send("Backend alive!"));
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
