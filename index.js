@@ -79,7 +79,7 @@ app.post("/chat", async (req,res) => {
     const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ТВОЙ_GROQ_API_KEY`,
+        "Authorization": `Bearer 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`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
