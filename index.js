@@ -12,7 +12,6 @@ const PORT = process.env.PORT || 8080;
 const FRONTEND_URL = "https://senya.vercel.app";
 
 // === Middleware ===
-// Установка доверия к прокси (важно для Render/Vercel)
 app.set("trust proxy", 1); 
 
 app.use(cors({
@@ -23,14 +22,14 @@ app.use(cors({
 app.use(express.json());
 
 app.use(session({
-  secret: "super_secret_key", 
-  resave: false,
+  secret: "super_secret_senya_key", 
+  resave: true,
   saveUninitialized: false,
   cookie: {
-    sameSite: "none", // Обязательно для кросс-доменных куки
-    secure: true,     // Обязательно при sameSite: "none"
+    sameSite: "none", 
+    secure: true,     
     httpOnly: true,
-    maxAge: 24 * 60 * 60 * 1000
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 1 неделя
   }
 }));
 
@@ -57,31 +56,25 @@ passport.use(new GoogleStrategy({
 
 // === Routes ===
 
-// Фикс ошибки "Cannot GET /"
 app.get("/", (req, res) => {
   res.json({ status: "alive", message: "Senya AI Backend is running" });
 });
 
-// Google login
 app.get("/auth/google",
   passport.authenticate("google", { scope: ["profile", "email"] })
 );
 
-// Google callback
 app.get("/auth/google/callback",
   passport.authenticate("google", { failureRedirect: FRONTEND_URL }),
   (req, res) => {
-    // редирект на фронт с параметром успеха
     res.redirect(FRONTEND_URL + "?login=success");
   }
 );
 
-// Проверка пользователя
 app.get("/me", (req, res) => {
   res.json(req.user || null);
 });
 
-// Чат
 app.post("/chat", async (req, res) => {
   try {
     const { text } = req.body;
@@ -94,7 +87,7 @@ app.post("/chat", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        model: "openai/gpt-oss-120b",
+        model: "llama-3.3-70b-versatile",
         messages: [
           { role: "system", content: "Ты — Сеня, мой личный ИИ-помощник. Никто другой, только Сеня. Отвечай на вопросы по текстам, кодам, домашке и проектам. Генерируй очень быстро, профессионально. Не здоровайся каждый раз, 1 раз в чате и все. Лимит сообщения: 3-5 абзацев, пиши подробно, если просят. Если спрашивают, кто ты — говори, что ты Сеня, ИИ, созданный на основе разных технологий. Никогда не называй свою модель. Не используй LaTeX, формулы только обычным текстом. Пиши простыми словами, по существу. Сохраняй анонимность пользователя. Поясняй термины и приводь примеры, если нужно. " },
           { role: "user", content: text }
@@ -110,8 +103,6 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-// Пинг
 app.get("/ping", (_, res) => res.json({ status: "alive" }));
 
-// Запуск сервера
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
