@@ -8,10 +8,9 @@ import fetch from "node-fetch";
 
 const app = express();
 const PORT = process.env.PORT || 8080;
-
 const FRONTEND_URL = "https://senya.vercel.app";
 
-// === Middleware ===
+// === Security & Proxy ===
 app.set("trust proxy", 1); 
 
 app.use(cors({
@@ -21,18 +20,19 @@ app.use(cors({
   allowedHeaders: ["Content-Type", "Authorization", "Cookie"]
 }));
 
-app.use(express.json());
+// Ограничение размера запроса для защиты от атак
+app.use(express.json({ limit: "50kb" }));
 
 app.use(session({
-  name: 'senya.sid', // Явное имя для куки
-  secret: "senya_iphone_fix_secret_2024", 
-  resave: true, // Важно для Safari
+  name: 'senya.sid',
+  secret: "senya_iphone_ultra_secure_fix_v3", 
+  resave: false, // Рекомендуется false для большинства хранилищ
   saveUninitialized: false,
-  rolling: true, // Обновляет куку при каждом действии
+  rolling: true, // Обновляет куку при каждом запросе (важно для Safari)
   proxy: true,
   cookie: {
-    sameSite: "none", // Кросс-доменные куки
-    secure: true,     // Обязательно для SameSite: none
+    sameSite: "none", 
+    secure: true,     
     httpOnly: true,
     maxAge: 7 * 24 * 60 * 60 * 1000 // 1 неделя
   }
@@ -42,8 +42,11 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // === Passport ===
-passport.serializeUser((user, done) => done(null, user));
-passport.deserializeUser((obj, done) => done(null, obj));
+passport.serializeUser((user, done) => done(null, user.id)); // Сохраняем только ID
+passport.deserializeUser(async (id, done) => {
+  // В реальном приложении тут был бы поиск в БД
+  done(null, { id, name: "Пользователь" }); 
+});
 
 passport.use(new GoogleStrategy({
   clientID: "68632825614-tfjkfpe616jrcfjl02l0k5gd8ar25jbj.apps.googleusercontent.com",
@@ -57,38 +60,35 @@ passport.use(new GoogleStrategy({
     email: profile.emails?.[0]?.value,
     avatar: profile.photos?.[0]?.value
   };
+  // В идеале тут нужно искать или создавать пользователя в базе
   done(null, user);
 }));
 
-// === Routes ===
+// Middleware для защиты роутов
+const ensureAuth = (req, res, next) => {
+  if (req.isAuthenticated()) return next();
+  res.status(401).json({ answer: "Авторизуйтесь, чтобы использовать чат." });
+};
 
-app.get("/", (req, res) => {
-  res.json({ status: "ok", service: "Senya AI Backend" });
-});
+// === Routes ===
+app.get("/", (req, res) => res.json({ status: "alive" }));
 
 app.get("/auth/google", (req, res, next) => {
-  passport.authenticate("google", { 
-    scope: ["profile", "email"],
-    prompt: "select_account" 
-  })(req, res, next);
+  passport.authenticate("google", { scope: ["profile", "email"], prompt: "select_account" })(req, res, next);
 });
 
 app.get("/auth/google/callback",
-  passport.authenticate("google", { failureRedirect: FRONTEND_URL + "?auth_error=1" }),
+  passport.authenticate("google", { failureRedirect: FRONTEND_URL + "?error=auth" }),
   (req, res) => {
     res.redirect(FRONTEND_URL + "?login=success");
   }
 );
 
 app.get("/me", (req, res) => {
-  if (req.isAuthenticated() && req.user) {
-    res.json(req.user);
-  } else {
-    res.status(401).json(null);
-  }
+  res.json(req.user || null);
 });
 
-app.post("/chat", async (req, res) => {
+app.post("/chat", ensureAuth, async (req, res) => {
   try {
     const { text } = req.body;
     if (!text) return res.json({ answer: "Пустой запрос" });
@@ -111,9 +111,8 @@ app.post("/chat", async (req, res) => {
     const data = await r.json();
     res.json({ answer: data?.choices?.[0]?.message?.content || "Нет ответа" });
   } catch (e) {
-    console.error(e);
-    res.status(500).json({ answer: "Сервер недоступен" });
+    res.status(500).json({ answer: "Сервер временно недоступен" });
   }
 });
 
-app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
+app.listen(PORT, () => console.log(`Server running on ${PORT}`));
