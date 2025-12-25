@@ -53,6 +53,19 @@ function authenticateToken(req, res, next) {
 // Роут для общения с ИИ (защищен JWT токеном)
 app.post('/chat', authenticateToken, async (req, res) => {
     try {
+        // 1. Проверяем, что сообщения вообще пришли
+        if (!req.body.messages || !Array.isArray(req.body.messages)) {
+            return res.status(400).json({ error: "Массив сообщений пуст или неверен" });
+        }
+
+        // 2. Очищаем сообщения перед отправкой в Groq.
+        // Оставляем ТОЛЬКО 'role' и 'content'.
+        // Заменяем роль 'ai' на 'assistant', чтобы API не выдавал ошибку discriminator.
+        const sanitizedMessages = req.body.messages.map(msg => ({
+            role: (msg.role === 'ai') ? 'assistant' : msg.role,
+            content: String(msg.content)
+        }));
+
         const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
@@ -60,22 +73,26 @@ app.post('/chat', authenticateToken, async (req, res) => {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                model: "llama3-8b-8192", // Используйте вашу предпочитаемую модель
-                messages: req.body.messages, // Передаем всю историю чата
+                model: "llama3-8b-8192",
+                messages: sanitizedMessages, // Отправляем очищенный массив
                 temperature: 0.7,
                 max_tokens: 1024
             })
         });
         
+        // Получаем JSON сразу, чтобы удобно вытащить ошибку если она есть
+        const data = await groqResponse.json();
+
         if (!groqResponse.ok) {
-            const errorBody = await groqResponse.text();
-            console.error("Groq API error:", groqResponse.status, errorBody);
-            return res.status(groqResponse.status).json({ error: `Groq API returned an error: ${errorBody}` });
+            console.error("Groq API error details:", data);
+            // Возвращаем более понятную ошибку пользователю
+            const errorMsg = data.error?.message || JSON.stringify(data);
+            return res.status(groqResponse.status).json({ error: `Groq API error: ${errorMsg}` });
         }
 
-        const data = await groqResponse.json();
         const aiResponseContent = data.choices[0]?.message?.content || "Произошла неизвестная ошибка в ИИ.";
         res.json({ response: aiResponseContent });
+
     } catch (e) {
         console.error("Chat processing error:", e);
         res.status(500).json({ error: e.message });
