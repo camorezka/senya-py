@@ -82,11 +82,12 @@ app.get("/auth/google", (req, res, next) => {
 });
 
 app.get("/auth/google/callback",
-  passport.authenticate("google", { failureRedirect: FRONTEND_URL + "?error=auth" }),
+  passport.authenticate("google", { failureRedirect: FRONTEND_URL + "?auth_error=1" }),
   (req, res) => {
-    res.redirect(FRONTEND_URL + "?login=success");
+    res.redirect(FRONTEND_URL + "/?login=success&ts=" + Date.now());
   }
 );
+
 
 app.get("/me", (req, res) => {
   res.json(req.user || null);
