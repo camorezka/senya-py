@@ -4,25 +4,14 @@ import session from "express-session";
 import passport from "passport";
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import fetch from "node-fetch";
-
-const app = express();
-
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Отдаём файлы из папки public
-app.use(express.static(path.join(__dirname, "public")));
-
-
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
-});
-
-
-
+const app = express();
 const PORT = process.env.PORT || 8080;
 
 /* ===== CORS ===== */
@@ -35,7 +24,7 @@ app.use(express.json());
 
 /* ===== SESSION ===== */
 app.use(session({
-  secret: process.env.SESSION_SECRET,
+  secret: process.env.SESSION_SECRET || "secret_key",
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -96,10 +85,7 @@ app.post("/chat", async (req, res) => {
       body: JSON.stringify({
         model: "openai/gpt-oss-120b",
         messages: [
-          {
-            role: "system",
-            content: "Ты — Сеня, личный ИИ-помощник. Пиши просто и по делу."
-          },
+          { role: "system", content: "Ты — Сеня, личный ИИ-помощник. Пиши просто и по делу." },
           { role: "user", content: text }
         ]
       })
@@ -118,6 +104,17 @@ app.post("/chat", async (req, res) => {
 /* ===== PING ===== */
 app.get("/ping", (_, res) => res.json({ status: "alive" }));
 
+/* ===== STATIC FRONTEND (если есть) ===== */
+const publicPath = path.join(__dirname, "public");
+if (fs.existsSync(publicPath)) {
+  app.use(express.static(publicPath));
+
+  app.get("*", (req, res) => {
+    res.sendFile(path.join(publicPath, "index.html"));
+  });
+}
+
+/* ===== START SERVER ===== */
 app.listen(PORT, () => {
-  console.log("Senya backend running on port", PORT);
+  console.log(`Senya backend running on port ${PORT}`);
 });
