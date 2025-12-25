@@ -6,6 +6,23 @@ import { Strategy as GoogleStrategy } from "passport-google-oauth20";
 import fetch from "node-fetch";
 
 const app = express();
+
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Отдаём файлы из папки public
+app.use(express.static(path.join(__dirname, "public")));
+
+
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "index.html"));
+});
+
+
+
 const PORT = process.env.PORT || 8080;
 
 /* ===== CORS ===== */
