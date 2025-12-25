@@ -2,119 +2,90 @@ const express = require('express');
 const cors = require('cors');
 const { OAuth2Client } = require('google-auth-library');
 const jwt = require('jsonwebtoken');
-const fetch = require('node-fetch'); // Для выполнения HTTP-запросов к Groq
 
 const app = express();
+app.use(cors()); // Включить CORS
+app.use(express.json());
 
-// Секретный ключ для подписи JWT токенов. В ПРОДАКШЕНЕ ИСПОЛЬЗУЙТЕ СЛОЖНЫЙ КЛЮЧ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ!
-const JWT_SECRET = process.env.JWT_SECRET || 'my-super-secret-jwt-key';
-
-// Данные из задания
+// Ваши данные
 const GOOGLE_CLIENT_ID = "68632825614-tfjkfpe616jrcfjl02l0k5gd8ar25jbj.apps.googleusercontent.com";
-const GROQ_API_KEY = "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";
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const MODEL = "llama3-8b-8192"; // Используем Llama3, т.к. "openai/gpt-oss-120b" - это не формат Groq
+const GROQ_KEY = "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"; // В ПРОДАКШЕНЕ храните в ENV переменных!
+const JWT_SECRET = process.env.JWT_SECRET || 'my-super-secret-jwt-key-for-senya'; // В ПРОДАКШЕНЕ ОБЯЗАТЕЛЬНО из ENV!
 
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
-app.use(cors()); // Включаем CORS для всех запросов
-app.use(express.json());
+// Роут для авторизации через Google
+app.post('/auth/google', async (req, res) => {
+    try {
+        const ticket = await client.verifyIdToken({ idToken: req.body.token, audience: GOOGLE_CLIENT_ID });
+        const payload = ticket.getPayload();
+        
+        // Создаем наш собственный JWT токен
+        const user = { 
+            id: payload.sub, 
+            name: payload.name, 
+            email: payload.email, 
+            picture: payload.picture 
+        };
+        const jwtToken = jwt.sign(user, JWT_SECRET, { expiresIn: '1h' }); // Токен на 1 час
 
-// Заглушка для главной страницы бэкенда
-app.get('/', (req, res) => {
-    res.send('Senya AI Backend is running!');
+        res.json({ success: true, user: user, jwtToken: jwtToken });
+    } catch (e) {
+        console.error("Google Auth Error:", e.message);
+        res.status(401).json({ success: false, error: e.message });
+    }
 });
 
 // Middleware для проверки JWT токена
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = authHeader && authHeader.split(' ')[1]; // Получаем токен из "Bearer TOKEN"
 
-    if (token == null) return res.sendStatus(401); // Если токена нет
+    if (token == null) return res.status(401).json({ error: 'Требуется авторизация.' });
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.sendStatus(403); // Если токен невалидный
-        req.user = user;
+        if (err) return res.status(403).json({ error: 'Недействительный токен.' }); // Токен невалиден или просрочен
+        req.user = user; // Сохраняем данные пользователя в запросе
         next();
     });
 }
 
-// 1. Авторизация Google
-app.post('/auth/google', async (req, res) => {
-    const { token } = req.body;
-    try {
-        const ticket = await client.verifyIdToken({
-            idToken: token,
-            audience: GOOGLE_CLIENT_ID,
-        });
-        const payload = ticket.getPayload();
-        
-        // Создаем JWT токен для нашего приложения
-        const user = { 
-            id: payload.sub, // Уникальный ID пользователя Google
-            name: payload.name,
-            email: payload.email,
-            picture: payload.picture
-        };
-        const jwtToken = jwt.sign(user, JWT_SECRET, { expiresIn: '1h' }); // Токен действует 1 час
-
-        res.json({
-            success: true,
-            user: {
-                name: user.name,
-                email: user.email,
-                picture: user.picture
-            },
-            jwtToken: jwtToken // Отправляем наш JWT токен на фронтенд
-        });
-
-    } catch (error) {
-        console.error('Google Auth Error:', error);
-        res.status(401).json({ success: false, error: 'Недействительный токен Google' });
-    }
-});
-
-// 2. Проксирование запросов к Groq API (защищено JWT токеном)
+// Роут для общения с ИИ (защищен JWT токеном)
 app.post('/chat', authenticateToken, async (req, res) => {
-    const { messages, model = MODEL } = req.body; // Получаем историю сообщений и модель
-
-    if (!messages || !Array.isArray(messages)) {
-        return res.status(400).json({ error: 'Неверный формат сообщений.' });
-    }
-
     try {
-        const groqResponse = await fetch(GROQ_API_URL, {
-            method: 'POST',
+        const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            method: "POST",
             headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${GROQ_API_KEY}` // Используем API ключ Groq
+                "Authorization": `Bearer ${GROQ_KEY}`,
+                "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                model: model,
-                messages: messages,
-                temperature: 0.7, // Можно настроить "креативность" ИИ
-                max_tokens: 1024,
+                model: "llama3-8b-8192", // Используйте вашу предпочитаемую модель
+                messages: req.body.messages, // Передаем всю историю чата
+                temperature: 0.7,
+                max_tokens: 1024
             })
         });
-
+        
         if (!groqResponse.ok) {
-            const errorText = await groqResponse.text();
-            console.error('Groq API Error:', groqResponse.status, errorText);
-            throw new Error(`Ошибка Groq API: ${groqResponse.status} - ${errorText}`);
+            const errorBody = await groqResponse.text();
+            console.error("Groq API error:", groqResponse.status, errorBody);
+            return res.status(groqResponse.status).json({ error: `Groq API returned an error: ${errorBody}` });
         }
 
-        const groqData = await groqResponse.json();
-        // Извлекаем ответ ИИ
-        const aiResponseContent = groqData.choices[0]?.message?.content || "Не удалось получить ответ от ИИ.";
-
+        const data = await groqResponse.json();
+        const aiResponseContent = data.choices[0]?.message?.content || "Произошла неизвестная ошибка в ИИ.";
         res.json({ response: aiResponseContent });
-
-    } catch (error) {
-        console.error('Error processing chat:', error);
-        res.status(500).json({ error: error.message });
+    } catch (e) {
+        console.error("Chat processing error:", e);
+        res.status(500).json({ error: e.message });
     }
 });
 
+// Главная страница бэкенда
+app.get('/', (req, res) => {
+    res.send('Senya AI Backend is operational!');
+});
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`Backend server running on port ${PORT}`));
