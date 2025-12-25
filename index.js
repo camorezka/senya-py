@@ -1,3 +1,4 @@
+
 import express from "express";
 import cors from "cors";
 import session from "express-session";
@@ -11,21 +12,25 @@ const PORT = process.env.PORT || 8080;
 const FRONTEND_URL = "https://senya.vercel.app";
 
 // === Middleware ===
-app.set("trust proxy", 1); // если за прокси (Vercel, Render)
+// Установка доверия к прокси (важно для Render/Vercel)
+app.set("trust proxy", 1); 
+
 app.use(cors({
   origin: FRONTEND_URL,
   credentials: true,
 }));
+
 app.use(express.json());
+
 app.use(session({
-  secret: "super_secret_key", // можешь поменять
+  secret: "super_secret_key", 
   resave: false,
   saveUninitialized: false,
   cookie: {
-    sameSite: "none",
-    secure: true,
+    sameSite: "none", // Обязательно для кросс-доменных куки
+    secure: true,     // Обязательно при sameSite: "none"
     httpOnly: true,
-    maxAge: 24*60*60*1000
+    maxAge: 24 * 60 * 60 * 1000
   }
 }));
 
@@ -39,7 +44,8 @@ passport.deserializeUser((obj, done) => done(null, obj));
 passport.use(new GoogleStrategy({
   clientID: "68632825614-tfjkfpe616jrcfjl02l0k5gd8ar25jbj.apps.googleusercontent.com",
   clientSecret: "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",
-  callbackURL: "https://senya-py.onrender.com/auth/google/callback"
+  callbackURL: "https://senya-py.onrender.com/auth/google/callback",
+  proxy: true 
 }, (accessToken, refreshToken, profile, done) => {
   const user = {
     id: profile.id,
@@ -51,6 +57,11 @@ passport.use(new GoogleStrategy({
 
 // === Routes ===
 
+// Фикс ошибки "Cannot GET /"
+app.get("/", (req, res) => {
+  res.json({ status: "alive", message: "Senya AI Backend is running" });
+});
+
 // Google login
 app.get("/auth/google",
   passport.authenticate("google", { scope: ["profile", "email"] })
@@ -58,9 +69,9 @@ app.get("/auth/google",
 
 // Google callback
 app.get("/auth/google/callback",
-  passport.authenticate("google", { failureRedirect: "/" }),
+  passport.authenticate("google", { failureRedirect: FRONTEND_URL }),
   (req, res) => {
-    // редирект на фронт с info о сессии
+    // редирект на фронт с параметром успеха
     res.redirect(FRONTEND_URL + "?login=success");
   }
 );
@@ -71,7 +82,7 @@ app.get("/me", (req, res) => {
 });
 
 // Чат
-app.post("/chat", async (req,res) => {
+app.post("/chat", async (req, res) => {
   try {
     const { text } = req.body;
     if (!text) return res.json({ answer: "Пустой запрос" });
@@ -85,7 +96,7 @@ app.post("/chat", async (req,res) => {
       body: JSON.stringify({
         model: "openai/gpt-oss-120b",
         messages: [
-          { role: "system", content: "Ты — Сеня, мой личный ИИ-помощник. Никто другой, только Сеня. Отвечай на вопросы по текстам, кодам, домашке и проектам. Генерируй очень быстро, проффисеонально. Не здоровайся каждый раз, 1 раз в чате и все. Лимит сообщения: 3-5 абзацев, пиши подробно, если просят. Если спрашивают, кто ты — говори, что ты Сеня, ИИ, созданный на основе разных технологий. Никогда не называй свою модель. Не используй LaTeX, формулы только обычным текстом. Пиши простыми словами, по существу. Сохраняй анонимность пользователя. Поясняй термины и приводь примеры, если нужно. " },
+          { role: "system", content: "Ты — Сеня, мой личный ИИ-помощник. Никто другой, только Сеня. Отвечай на вопросы по текстам, кодам, домашке и проектам. Генерируй очень быстро, профессионально. Не здоровайся каждый раз, 1 раз в чате и все. Лимит сообщения: 3-5 абзацев, пиши подробно, если просят. Если спрашивают, кто ты — говори, что ты Сеня, ИИ, созданный на основе разных технологий. Никогда не называй свою модель. Не используй LaTeX, формулы только обычным текстом. Пиши простыми словами, по существу. Сохраняй анонимность пользователя. Поясняй термины и приводь примеры, если нужно. " },
           { role: "user", content: text }
         ]
       })
