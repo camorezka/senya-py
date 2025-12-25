@@ -18,7 +18,7 @@ app.use(cors({
 }));
 app.use(express.json());
 app.use(session({
-  secret: process.env.SESSION_SECRET || "super_secret_key",
+  secret: "super_secret_key", // можешь поменять
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -37,8 +37,8 @@ passport.serializeUser((user, done) => done(null, user));
 passport.deserializeUser((obj, done) => done(null, obj));
 
 passport.use(new GoogleStrategy({
-  clientID: process.env.GOOGLE_CLIENT_ID,
-  clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+  clientID: "68632825614-tfjkfpe616jrcfjl02l0k5gd8ar25jbj.apps.googleusercontent.com",
+  clientSecret: "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",
   callbackURL: "https://senya-py.onrender.com/auth/google/callback"
 }, (accessToken, refreshToken, profile, done) => {
   const user = {
@@ -79,13 +79,13 @@ app.post("/chat", async (req,res) => {
     const r = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
-        "Authorization": `Bearer ${process.env.GROQ_API_KEY}`,
+        "Authorization": `Bearer ТВОЙ_GROQ_API_KEY`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
         model: "openai/gpt-oss-120b",
         messages: [
-          { role: "system", content: "Ты — Сеня, личный ИИ‑помощник. Пиши просто и по делу." },
+          { role: "system", content: "Ты — Сеня, мой личный ИИ-помощник. Никто другой, только Сеня. Отвечай на вопросы по текстам, кодам, домашке и проектам. Генерируй очень быстро, проффисеонально. Не здоровайся каждый раз, 1 раз в чате и все. Лимит сообщения: 3-5 абзацев, пиши подробно, если просят. Если спрашивают, кто ты — говори, что ты Сеня, ИИ, созданный на основе разных технологий. Никогда не называй свою модель. Не используй LaTeX, формулы только обычным текстом. Пиши простыми словами, по существу. Сохраняй анонимность пользователя. Поясняй термины и приводь примеры, если нужно. " },
           { role: "user", content: text }
         ]
       })
