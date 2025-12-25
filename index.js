@@ -43,7 +43,7 @@ const GOOGLE_CLIENT_ID = "68632825614-tfjkfpe616jrcfjl02l0k5gd8ar25jbj.apps.goog
 
 // ВАЖНО: Никогда не храни ключ в коде. На Render добавь его в Environment Variables
 
-const GROQ_KEY = process.env.GROQ_KEY || "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"; 
+const GROQ_KEY = process.env.GROQ_KEY || "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"; 
 
 const JWT_SECRET = process.env.JWT_SECRET || 'my-super-secret-jwt-key-for-senya';
 
