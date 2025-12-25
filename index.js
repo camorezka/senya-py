@@ -18,22 +18,23 @@ app.use(cors({
   origin: FRONTEND_URL,
   credentials: true,
   methods: ["GET", "POST", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"]
+  allowedHeaders: ["Content-Type", "Authorization", "Cookie"]
 }));
 
 app.use(express.json());
 
 app.use(session({
-  secret: "senya_ultra_secure_key_99", 
-  resave: true, // Для Safari/iOS лучше оставить true, чтобы кука обновлялась
+  name: 'senya.sid', // Явное имя для куки
+  secret: "senya_iphone_fix_secret_2024", 
+  resave: true, // Важно для Safari
   saveUninitialized: false,
-  rolling: true, // Обновляет куку при каждом запросе
+  rolling: true, // Обновляет куку при каждом действии
   proxy: true,
   cookie: {
-    sameSite: "none", 
-    secure: true,     
+    sameSite: "none", // Кросс-доменные куки
+    secure: true,     // Обязательно для SameSite: none
     httpOnly: true,
-    maxAge: 1000 * 60 * 60 * 24 * 7 // 7 дней
+    maxAge: 7 * 24 * 60 * 60 * 1000 // 1 неделя
   }
 }));
 
@@ -62,18 +63,18 @@ passport.use(new GoogleStrategy({
 // === Routes ===
 
 app.get("/", (req, res) => {
-  res.send("Senya API Online");
+  res.json({ status: "ok", service: "Senya AI Backend" });
 });
 
 app.get("/auth/google", (req, res, next) => {
-  // Очистка старой сессии перед входом
-  req.logout((err) => {
-    passport.authenticate("google", { scope: ["profile", "email"], prompt: "select_account" })(req, res, next);
-  });
+  passport.authenticate("google", { 
+    scope: ["profile", "email"],
+    prompt: "select_account" 
+  })(req, res, next);
 });
 
 app.get("/auth/google/callback",
-  passport.authenticate("google", { failureRedirect: FRONTEND_URL + "?error=auth" }),
+  passport.authenticate("google", { failureRedirect: FRONTEND_URL + "?auth_error=1" }),
   (req, res) => {
     res.redirect(FRONTEND_URL + "?login=success");
   }
@@ -115,6 +116,4 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-app.get("/ping", (_, res) => res.json({ status: "alive" }));
-
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+app.listen(PORT, () => console.log(`Backend running on port ${PORT}`));
