@@ -145,11 +145,10 @@ app.post('/chat', authenticateToken, async (req, res) => {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                // ИСПОЛЬЗУЙ РЕАЛЬНУЮ МОДЕЛЬ GROQ:
                 model: "openai/gpt-oss-120b", 
                 messages: sanitizedMessages,
                 temperature: 0.7,
-                max_tokens: 4096 // Увеличил, чтобы таблицы не обрывались
+                max_tokens: 3072 
             })
         });
 
