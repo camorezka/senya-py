@@ -176,21 +176,14 @@ app.post('/chat', authenticateToken, async (req, res) => {
         });
 
         
-
         const data = await groqResponse.json();
-
-
+        
         if (!groqResponse.ok) {
-
-            console.error("Groq API Error:", data);
-
-            return res.status(groqResponse.status).json({ error: data.error?.message || "Ошибка Groq" });
-
+            return res.status(groqResponse.status).json({ error: "Ошибка Groq" });
         }
 
-
-
-        res.json({ response: data.choices[0]?.message?.content });
+        const aiReply = data.choices[0]?.message?.content || "Не удалось получить ответ";
+        res.json({ response: String(aiReply) });
 
 
     } catch (e) {
