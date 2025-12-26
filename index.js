@@ -146,7 +146,7 @@ app.post('/chat', authenticateToken, async (req, res) => {
             },
             body: JSON.stringify({
                 // ИСПОЛЬЗУЙ РЕАЛЬНУЮ МОДЕЛЬ GROQ:
-                model: "llama-3.3-70b-versatile", 
+                model: "openai/gpt-oss-120b", 
                 messages: sanitizedMessages,
                 temperature: 0.7,
                 max_tokens: 2048 // Увеличил, чтобы таблицы не обрывались
