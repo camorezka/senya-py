@@ -117,95 +117,63 @@ function authenticateToken(req, res, next) {
 
 
 app.post('/chat', authenticateToken, async (req, res) => {
-
     try {
-
         const { messages } = req.body;
 
-
-     
-
         if (!messages || !Array.isArray(messages)) {
-
-            return res.status(400).json({ error: "Неверный формат данных. Ожидается массив messages." });
-
+            return res.status(400).json({ error: "Неверный формат данных." });
         }
 
-
-
+        // Санитизация сообщений
         const sanitizedMessages = messages.map(msg => ({
+            role: (msg.role === 'ai' || msg.role === 'assistant' || msg.role === 'bot') ? 'assistant' : 'user',
+            content: String(msg.content || "") 
+        })).filter(msg => msg.content.trim() !== "");
 
-            role: (msg.role === 'ai' || msg.role === 'assistant') ? 'assistant' : 'user',
-
-            content: String(msg.content || msg.text || "") 
-
-        })).filter(msg => msg.content.trim() !== ""); 
-
-
-        if (sanitizedMessages.length === 0) {
-
-            return res.status(400).json({ error: "Список сообщений пуст" });
-
+        // Проверка на наличие системного промпта (опционально, но полезно для "характера" Сени)
+        if (sanitizedMessages.length > 0 && sanitizedMessages[0].role !== 'system') {
+            sanitizedMessages.unshift({
+                role: "system",
+                content: "Ты — Сеня, элитный ИИ помощник. Отвечай вежливо и профессионально."
+            });
         }
-
 
         const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-
             method: "POST",
-
             headers: {
-
                 "Authorization": `Bearer ${GROQ_KEY}`,
-
                 "Content-Type": "application/json"
-
             },
-
             body: JSON.stringify({
-
-                model: "openai/gpt-oss-120b",
-
+                // ИСПОЛЬЗУЙ РЕАЛЬНУЮ МОДЕЛЬ GROQ:
+                model: "llama-3.3-70b-versatile", 
                 messages: sanitizedMessages,
-
                 temperature: 0.7,
-
-                max_tokens: 1024
-
+                max_tokens: 2048 // Увеличил, чтобы таблицы не обрывались
             })
-
         });
 
-        
         const data = await groqResponse.json();
-        
+
         if (!groqResponse.ok) {
-            return res.status(groqResponse.status).json({ error: "Ошибка Groq" });
+            console.error("Groq API Error:", data);
+            return res.status(groqResponse.status).json({ error: data.error?.message || "Ошибка Groq" });
         }
 
-     
         let aiReply = data.choices?.[0]?.message?.content;
-        if (Array.isArray(aiReply)) {
-            aiReply = aiReply.map(x => x?.text || x?.content || "").join("\n");
+
+        if (!aiReply) {
+            return res.status(500).json({ error: "Пустой ответ от модели" });
         }
-        
-        if (typeof aiReply !== 'string') {
-            aiReply = JSON.stringify(aiReply, null, 2);
-        }
-        
+
+        // Отправляем чистую строку. Фронтенд сам прогонит её через marked.js
         res.json({ response: aiReply });
 
-
-
     } catch (e) {
-
         console.error("Server Error:", e);
-
         res.status(500).json({ error: "Внутренняя ошибка сервера" });
-
     }
-
 });
-
 
 app.get('/', (req, res) => res.send('Senya AI Backend is operational!'));
 
