@@ -30,7 +30,7 @@ app.use(express.json());
 
 const GOOGLE_CLIENT_ID = "68632825614-tfjkfpe616jrcfjl02l0k5gd8ar25jbj.apps.googleusercontent.com";
 
-const GROQ_KEY = process.env.GROQ_KEY || "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"; 
+const GROQ_KEY = process.env.GROQ_KEY || "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"; 
 
 const JWT_SECRET = process.env.JWT_SECRET || 'my-super-secret-jwt-key-for-senya';
 
