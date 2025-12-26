@@ -10,29 +10,18 @@ const jwt = require('jsonwebtoken');
 const app = express();
 
 
-// 1. Исправляем политику COOP и CORS
 
 app.use((req, res, next) => {
-
-    // Эти заголовки решают проблему "Cross-Origin-Opener-Policy" в Chrome
-
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-
-    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
-
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     next();
-
 });
 
 
 app.use(cors({
-
-    origin: '*', // Для Render/Vercel лучше потом заменить на конкретный домен
-
+    origin: ['https://senya.vercel.app'],
     methods: ['GET', 'POST'],
-
     allowedHeaders: ['Content-Type', 'Authorization']
-
 }));
 
 
@@ -40,8 +29,6 @@ app.use(express.json());
 
 
 const GOOGLE_CLIENT_ID = "68632825614-tfjkfpe616jrcfjl02l0k5gd8ar25jbj.apps.googleusercontent.com";
-
-// ВАЖНО: Никогда не храни ключ в коде. На Render добавь его в Environment Variables
 
 const GROQ_KEY = process.env.GROQ_KEY || "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"; 
 
@@ -51,7 +38,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'my-super-secret-jwt-key-for-senya'
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
 
-// Авторизация через Google
+
 
 app.post('/auth/google', async (req, res) => {
 
@@ -102,7 +89,7 @@ app.post('/auth/google', async (req, res) => {
 });
 
 
-// Middleware проверки JWT
+
 
 function authenticateToken(req, res, next) {
 
@@ -127,7 +114,7 @@ function authenticateToken(req, res, next) {
 }
 
 
-// Роут чата
+
 
 app.post('/chat', authenticateToken, async (req, res) => {
 
@@ -136,7 +123,7 @@ app.post('/chat', authenticateToken, async (req, res) => {
         const { messages } = req.body;
 
 
-        // Исправление ошибки 400: проверяем структуру
+     
 
         if (!messages || !Array.isArray(messages)) {
 
@@ -145,15 +132,14 @@ app.post('/chat', authenticateToken, async (req, res) => {
         }
 
 
-        // Очистка сообщений: убираем лишние поля, оставляем только роль и контент
 
         const sanitizedMessages = messages.map(msg => ({
 
             role: (msg.role === 'ai' || msg.role === 'assistant') ? 'assistant' : 'user',
 
-            content: String(msg.content || msg.text || "") // Обработка разных имен полей
+            content: String(msg.content || msg.text || "") 
 
-        })).filter(msg => msg.content.trim() !== ""); // Убираем пустые сообщения
+        })).filter(msg => msg.content.trim() !== ""); 
 
 
         if (sanitizedMessages.length === 0) {
@@ -203,7 +189,6 @@ app.post('/chat', authenticateToken, async (req, res) => {
         }
 
 
-        // Возвращаем ответ в поле 'response', чтобы фронтенд его увидел
 
         res.json({ response: data.choices[0]?.message?.content });
 
