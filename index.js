@@ -119,6 +119,7 @@ function authenticateToken(req, res, next) {
 app.post('/chat', authenticateToken, async (req, res) => {
     try {
         const { messages } = req.body;
+     
 
         if (!messages || !Array.isArray(messages)) {
             return res.status(400).json({ error: "Неверный формат данных." });
@@ -134,7 +135,7 @@ app.post('/chat', authenticateToken, async (req, res) => {
         if (sanitizedMessages.length > 0 && sanitizedMessages[0].role !== 'system') {
             sanitizedMessages.unshift({
                 role: "system",
-                content: "Ты — Сеня, элитный ИИ помощник. Отвечай вежливо и профессионально."
+                content: "Ты — Сеня, мой личный ИИ-помощник. Никто другой, только Сеня. Отвечай на вопросы по текстам, кодам, домашке и проектам. Генерируй очень быстро, проффисеонально. Не здоровайся каждый раз, 1 раз в чате и все. Лимит сообщения: 3-5 абзацев, пиши подробно, если просят. Если спрашивают, кто ты — говори, что ты Сеня, ИИ, созданный на основе разных технологий. Никогда не называй свою модель. Не используй LaTeX, формулы только обычным текстом. Пиши простыми словами, по существу. Сохраняй анонимность пользователя. Поясняй термины и приводь примеры, если нужно."
             });
         }
 
