@@ -182,8 +182,18 @@ app.post('/chat', authenticateToken, async (req, res) => {
             return res.status(groqResponse.status).json({ error: "Ошибка Groq" });
         }
 
-        const aiReply = data.choices[0]?.message?.content || "Не удалось получить ответ";
-        res.json({ response: String(aiReply) });
+     
+        let aiReply = data.choices?.[0]?.message?.content;
+        if (Array.isArray(aiReply)) {
+            aiReply = aiReply.map(x => x?.text || x?.content || "").join("\n");
+        }
+        
+        if (typeof aiReply !== 'string') {
+            aiReply = JSON.stringify(aiReply, null, 2);
+        }
+        
+        res.json({ response: aiReply });
+
 
 
     } catch (e) {
