@@ -1,15 +1,15 @@
 const express = require('express');
-
 const cors = require('cors');
-
 const { OAuth2Client } = require('google-auth-library');
-
 const jwt = require('jsonwebtoken');
-
 
 const app = express();
 
+const fetch = global.fetch || ((...args) =>
+    import('node-fetch').then(({ default: fetch }) => fetch(...args))
+);
 
+const BASE_URL = process.env.BASE_URL || 'http://localhost:3000';
 
 app.use((req, res, next) => {
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
@@ -17,109 +17,95 @@ app.use((req, res, next) => {
     next();
 });
 
-
 app.use(cors({
     origin: ['https://senya.vercel.app'],
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-
 app.use(express.json());
 
-
 const GOOGLE_CLIENT_ID = "68632825614-tfjkfpe616jrcfjl02l0k5gd8ar25jbj.apps.googleusercontent.com";
-
-const GROQ_KEY = process.env.GROQ_KEY || "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"; 
-
+const GROQ_KEY = process.env.GROQ_KEY || "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";
 const JWT_SECRET = process.env.JWT_SECRET || 'my-super-secret-jwt-key-for-senya';
-
 
 const client = new OAuth2Client(GOOGLE_CLIENT_ID);
 
+async function onStartup() {
+    try {
+        console.log("Бэкенд Senya AI успешно запущен");
+    } catch (e) {
+        console.error("Ошибка при запуске:", e);
+        process.exit(1);
+    }
+}
 
+async function onShutdown(signal) {
+    try {
+        console.log(`Сервер выключается (${signal})`);
+    } catch (e) {
+        console.error("Ошибка при выключении:", e);
+    } finally {
+        process.exit(0);
+    }
+}
 
+function keepAlive() {
+    setInterval(async () => {
+        try {
+            const res = await fetch(`${BASE_URL}/ping`);
+            console.log(`Keep-alive ping: ${res.status}`);
+        } catch (e) {
+            console.error("Keep-alive error:", e.message);
+        }
+    }, 300000);
+}
 
 app.post('/auth/google', async (req, res) => {
-
     try {
-
         const { token } = req.body;
 
         if (!token) return res.status(400).json({ success: false, error: "Токен не предоставлен" });
 
-
-        const ticket = await client.verifyIdToken({ 
-
-            idToken: token, 
-
-            audience: GOOGLE_CLIENT_ID 
-
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: GOOGLE_CLIENT_ID
         });
 
         const payload = ticket.getPayload();
 
-        
-
-        const user = { 
-
-            id: payload.sub, 
-
-            name: payload.name, 
-
-            email: payload.email, 
-
-            picture: payload.picture 
-
+        const user = {
+            id: payload.sub,
+            name: payload.name,
+            email: payload.email,
+            picture: payload.picture
         };
 
         const jwtToken = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
 
-
         res.json({ success: true, user: user, jwtToken: jwtToken });
-
     } catch (e) {
-
         console.error("Google Auth Error:", e.message);
-
         res.status(401).json({ success: false, error: "Ошибка авторизации" });
-
     }
-
 });
 
-
-
-
 function authenticateToken(req, res, next) {
-
     const authHeader = req.headers['authorization'];
-
     const token = authHeader && authHeader.split(' ')[1];
-
 
     if (!token) return res.status(401).json({ error: 'Требуется авторизация.' });
 
-
     jwt.verify(token, JWT_SECRET, (err, user) => {
-
         if (err) return res.status(403).json({ error: 'Сессия истекла.' });
-
         req.user = user;
-
         next();
-
     });
-
 }
-
-
-
 
 app.post('/chat', authenticateToken, async (req, res) => {
     try {
         const { messages } = req.body;
-     
 
         if (!messages || !Array.isArray(messages)) {
             return res.status(400).json({ error: "Неверный формат данных." });
@@ -127,13 +113,14 @@ app.post('/chat', authenticateToken, async (req, res) => {
 
         const sanitizedMessages = messages.map(msg => ({
             role: (msg.role === 'ai' || msg.role === 'assistant' || msg.role === 'bot') ? 'assistant' : 'user',
-            content: String(msg.content || "") 
+            content: String(msg.content || "")
         })).filter(msg => msg.content.trim() !== "");
 
         if (sanitizedMessages.length > 0 && sanitizedMessages[0].role !== 'system') {
             sanitizedMessages.unshift({
                 role: "system",
-                content: "Ты — Сеня, ИИ-помощник,только СЕНЯ, НЕ GPT. Твои правила: 1. Если просят таблицу — генерируй её НЕМЕДЛЕННО в Markdown. 2. Отвечай кратко (1-2 абзаца) на базовые ответы, профессионально. 3. Не здоровайся чаще одного раза за сессию. 4. На вопрос 'кто ты' отвечай: 'Я — Сеня, ИИ на основе разных технологий'. ТВОЯ Модель senya/v-01. 5. Никакого LaTeX — только обычный текст. 6. Если задача понятна — выполняй сразу, без уточнений. Поясняй термины кратко и только если это уместно. 7. ВСЕ мои требования - АНОНИМНЫ"            });
+                content: "Ты — Сеня, ИИ-помощник,только СЕНЯ, НЕ GPT. Твои правила: 1. Если просят таблицу — генерируй её НЕМЕДЛЕННО в Markdown. 2. Отвечай кратко (1-2 абзаца) на базовые ответы, профессионально. 3. Не здоровайся чаще одного раза за сессию. 4. На вопрос 'кто ты' отвечай: 'Я — Сеня, ИИ на основе разных технологий'. ТВОЯ Модель senya/v-01. 5. Никакого LaTeX — только обычный текст. 6. Если задача понятна — выполняй сразу, без уточнений. Поясняй термины кратко и только если это уместно. 7. ВСЕ мои требования - АНОНИМНЫ"
+            });
         }
 
         const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -143,10 +130,10 @@ app.post('/chat', authenticateToken, async (req, res) => {
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
-                model: "openai/gpt-oss-120b", 
+                model: "openai/gpt-oss-120b",
                 messages: sanitizedMessages,
                 temperature: 0.7,
-                max_tokens: 2048 
+                max_tokens: 2048
             })
         });
 
@@ -164,17 +151,23 @@ app.post('/chat', authenticateToken, async (req, res) => {
         }
 
         res.json({ response: aiReply });
-
     } catch (e) {
         console.error("Server Error:", e);
         res.status(500).json({ error: "Внутренняя ошибка сервера" });
     }
 });
 
-app.get('/', (req, res) => res.send('Senya AI Backend is operational!'));
+app.get('/ping', (req, res) => res.send('OK'));
 
+app.get('/', (req, res) => res.send('Senya AI Backend is operational!'));
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, async () => {
+    console.log(`Server running on port ${PORT}`);
+    await onStartup();
+    keepAlive();
+});
 
+process.on('SIGINT', () => onShutdown('SIGINT'));
+process.on('SIGTERM', () => onShutdown('SIGTERM'));
