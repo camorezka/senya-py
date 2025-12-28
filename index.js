@@ -1,4 +1,4 @@
- const express = require('express');
+const express = require('express');
 
 const cors = require('cors');
 
@@ -139,7 +139,7 @@ app.post('/chat', authenticateToken, async (req, res) => {
         const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
-                "Authorization": Bearer ${GROQ_KEY},
+                "Authorization": `Bearer ${GROQ_KEY}`,
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
@@ -176,4 +176,5 @@ app.get('/', (req, res) => res.send('Senya AI Backend is operational!'));
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => console.log(Server running on port ${PORT}));
+app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+
