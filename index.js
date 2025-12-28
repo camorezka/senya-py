@@ -12,14 +12,12 @@ const app = express();
 
 
 app.use((req, res, next) => {
-    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
-    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     next();
 });
 
 
 app.use(cors({
-    origin: ['https://senya.vercel.app'],
+    origin: true,
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -89,6 +87,31 @@ app.post('/auth/google', async (req, res) => {
 });
 
 
+app.get('/auth/google', async (req, res) => {
+    const token = req.query.credential;
+    if (!token) return res.redirect('https://senya.vercel.app');
+
+    try {
+        const ticket = await client.verifyIdToken({
+            idToken: token,
+            audience: GOOGLE_CLIENT_ID
+        });
+
+        const payload = ticket.getPayload();
+
+        const user = {
+            id: payload.sub,
+            name: payload.name,
+            email: payload.email,
+            picture: payload.picture
+        };
+
+        const jwtToken = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
+        res.redirect(`https://senya.vercel.app/?jwt=${jwtToken}&name=${encodeURIComponent(user.name)}&pic=${encodeURIComponent(user.picture)}`);
+    } catch {
+        res.redirect('https://senya.vercel.app');
+    }
+});
 
 
 function authenticateToken(req, res, next) {
