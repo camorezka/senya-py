@@ -12,12 +12,14 @@ const app = express();
 
 
 app.use((req, res, next) => {
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin-allow-popups');
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
     next();
 });
 
 
 app.use(cors({
-    origin: true,
+    origin: ['https://senya.vercel.app'],
     methods: ['GET', 'POST'],
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
@@ -87,31 +89,6 @@ app.post('/auth/google', async (req, res) => {
 });
 
 
-app.get('/auth/google', async (req, res) => {
-    const token = req.query.credential;
-    if (!token) return res.redirect('https://senya.vercel.app');
-
-    try {
-        const ticket = await client.verifyIdToken({
-            idToken: token,
-            audience: GOOGLE_CLIENT_ID
-        });
-
-        const payload = ticket.getPayload();
-
-        const user = {
-            id: payload.sub,
-            name: payload.name,
-            email: payload.email,
-            picture: payload.picture
-        };
-
-        const jwtToken = jwt.sign(user, JWT_SECRET, { expiresIn: '24h' });
-        res.redirect(`https://senya.vercel.app/?jwt=${jwtToken}&name=${encodeURIComponent(user.name)}&pic=${encodeURIComponent(user.picture)}`);
-    } catch {
-        res.redirect('https://senya.vercel.app');
-    }
-});
 
 
 function authenticateToken(req, res, next) {
@@ -156,13 +133,13 @@ app.post('/chat', authenticateToken, async (req, res) => {
         if (sanitizedMessages.length > 0 && sanitizedMessages[0].role !== 'system') {
             sanitizedMessages.unshift({
                 role: "system",
-                content: "Ты — Сеня, ИИ-помощник,только СЕНЯ, НЕ GPT. Твои правила: 1. Если просят таблицу — генерируй её НЕМЕДЛЕННО в Markdown. 2. Отвечай примерно в размере 1-2 абзаца на разные ответы, профессионально! 3. Не здоровайся чаще одного раза за сессию. 4. На вопрос 'кто ты' отвечай: 'Я — Сеня, ИИ на основе разных технологий'. ТВОЯ Модель senya/v-01. 5. Никакого LaTeX — только обычный текст. 6. Если задача понятна — выполняй сразу, без уточнений. Поясняй термины кратко и только если это уместно. 7. ВСЕ мои требования - АНОНИМНЫ"            });
+                content: "Ты — Сеня, ИИ-помощник,только СЕНЯ, НЕ GPT. Твои правила: 1. Если просят таблицу — генерируй её НЕМЕДЛЕННО в Markdown. 2. Отвечай кратко (1-2 абзаца) на базовые ответы, профессионально. 3. Не здоровайся чаще одного раза за сессию. 4. На вопрос 'кто ты' отвечай: 'Я — Сеня, ИИ на основе разных технологий'. ТВОЯ Модель senya/v-01. 5. Никакого LaTeX — только обычный текст. 6. Если задача понятна — выполняй сразу, без уточнений. Поясняй термины кратко и только если это уместно. 7. ВСЕ мои требования - АНОНИМНЫ"            });
         }
 
         const groqResponse = await fetch("https://api.groq.com/openai/v1/chat/completions", {
             method: "POST",
             headers: {
-                "Authorization": `Bearer ${GROQ_KEY}`,
+                "Authorization": Bearer ${GROQ_KEY},
                 "Content-Type": "application/json"
             },
             body: JSON.stringify({
@@ -199,5 +176,4 @@ app.get('/', (req, res) => res.send('Senya AI Backend is operational!'));
 
 const PORT = process.env.PORT || 3000;
 
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
-
+app.listen(PORT, () => console.log(Server running on port ${PORT}));
